@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Introdise</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="bg-gray-950 text-gray-200 min-h-screen flex flex-col">
+
+  <!-- Stats bar -->
+  <div class="bg-gray-900 border-b border-gray-800 p-3 flex justify-around text-sm">
+    <div><i class="fas fa-users mr-1"></i> <span id="online">0</span> online</div>
+    <div><i class="fas fa-user-friends mr-1"></i> <span id="total">0</span> souls</div>
+    <div><i class="fas fa-comment-dots mr-1"></i> <span id="chats">0</span> chats</div>
+  </div>
+
+  <!-- Setup -->
+  <div id="setup" class="flex-1 flex items-center justify-center p-6">
+    <div class="bg-gray-900 p-10 rounded-2xl w-full max-w-lg border border-gray-700">
+      <h1 class="text-5xl font-bold text-center mb-8 text-blue-400">Introdise</h1>
+
+      <div class="mb-8">
+        <label class="block text-lg mb-3 text-gray-300">Choose your vibe</label>
+        <div class="grid grid-cols-2 gap-4">
+          <button onclick="selectRole('Oppa')" class="bg-blue-900 hover:bg-blue-800 p-6 rounded-xl text-2xl font-bold transition" id="oppaBtn">
+            Oppa 💪
+          </button>
+          <button onclick="selectRole('Unnie')" class="bg-pink-900 hover:bg-pink-800 p-6 rounded-xl text-2xl font-bold transition" id="unnieBtn">
+            Unnie 💖
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-8">
+        <label class="block text-lg mb-3 text-gray-300">Your district</label>
+        <select id="district" class="w-full bg-gray-800 text-white p-4 rounded-xl border border-gray-700">
+          <option value="">Random / Anywhere</option>
+          <option value="Dhaka">Dhaka</option>
+          <option value="Chattogram">Chattogram</option>
+          <option value="Khulna">Khulna</option>
+          <option value="Rajshahi">Rajshahi</option>
+          <option value="Kushtia">Kushtia</option>
+          <option value="Pabna">Pabna</option>
+          <!-- Add more districts if needed -->
+        </select>
+      </div>
+
+      <button onclick="connect()" class="w-full bg-green-700 hover:bg-green-600 p-5 rounded-xl text-xl font-bold transition">
+        Start Chat
+      </button>
+
+      <div id="status" class="mt-6 text-center text-xl text-gray-400 min-h-[3rem]"></div>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div id="chat" class="hidden flex flex-col h-screen bg-black">
+    <div class="bg-gray-900 p-4 flex items-center justify-between border-b border-gray-800">
+      <button onclick="disconnect()" class="text-red-400 text-2xl"><i class="fas fa-times"></i></button>
+      <div class="text-center">
+        <div class="font-bold text-lg">Hidden Soul</div>
+        <div id="connStatus" class="text-sm text-gray-500 flex items-center gap-2 justify-center">
+          <span class="w-2 h-2 bg-gray-500 rounded-full"></span> Connecting...
+        </div>
+      </div>
+      <div class="w-8"></div>
+    </div>
+
+    <div id="messages" class="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-950"></div>
+
+    <div class="bg-gray-900 p-4 flex items-center gap-3 border-t border-gray-800">
+      <input id="msgInput" type="text" placeholder="Type here..." class="flex-1 bg-gray-800 text-white p-4 rounded-full outline-none focus:ring-1 focus:ring-blue-500">
+      <button onclick="sendMsg()" class="text-blue-400 text-2xl px-4"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <!-- Small, non-distracting footer -->
+  <footer class="fixed bottom-2 right-4 text-xs text-gray-600 opacity-60 pointer-events-none">
+    Developed by Nyctovar
+  </footer>
+
+  <script>
+    const socket = io();
+    let myRole = '';
+
+    socket.on('online', (count) => {
+      document.getElementById('online').textContent = count;
+    });
+
+    function selectRole(role) {
+      myRole = role;
+      document.getElementById('oppaBtn').classList.toggle('bg-blue-700', role === 'Oppa');
+      document.getElementById('unnieBtn').classList.toggle('bg-pink-700', role === 'Unnie');
+      document.getElementById('status').textContent = `Selected: ${role}`;
+    }
+
+    function connect() {
+      if (!myRole) return alert('Choose Oppa or Unnie');
+
+      document.getElementById('setup').classList.add('hidden');
+      document.getElementById('chat').classList.remove('hidden');
+
+      document.getElementById('connStatus').innerHTML = '<span class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span> Searching...';
+
+      socket.emit('join', { role: myRole });
+    }
+
+    socket.on('matched', () => {
+      document.getElementById('connStatus').innerHTML = '<span class="w-2 h-2 bg-green-500 rounded-full"></span> Connected';
+    });
+
+    socket.on('message', (msg) => {
+      addMessage(msg, 'them');
+    });
+
+    function sendMsg() {
+      const input = document.getElementById('msgInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      socket.emit('message', text);
+      addMessage(text, 'me');
+      input.value = '';
+    }
+
+    function addMessage(text, who) {
+      const div = document.createElement('div');
+      div.className = `flex ${who === 'me' ? 'justify-end' : 'justify-start'}`;
+      div.innerHTML = `
+        <div class="max-w-[80%] px-5 py-3 rounded-2xl ${who === 'me' ? 'bg-blue-600' : 'bg-gray-800'}">
+          ${text}
+        </div>`;
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    }
+
+    function disconnect() {
+      socket.emit('leave');
+      location.reload();
+    }
+
+    document.getElementById('msgInput')?.addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendMsg();
+    });
+    // Add this near the top of <script>
+let typingTimer;
+
+// When other user is typing
+socket.on('typing', () => {
+  const typingDiv = document.createElement('div');
+  typingDiv.id = 'typing';
+  typingDiv.className = 'text-gray-500 text-sm italic';
+  typingDiv.textContent = 'Typing...';
+  document.getElementById('messages').appendChild(typingDiv);
+  document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => typingDiv.remove(), 3000);
+});
+
+// When you type → send typing event
+document.getElementById('msgInput').addEventListener('input', () => {
+  socket.emit('typing');
+});
+  </script>
+</body>
+</html>
